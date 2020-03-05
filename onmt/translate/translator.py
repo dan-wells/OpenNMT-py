@@ -27,6 +27,12 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
         if len(opt.models) > 1 else onmt.model_builder.load_test_model
     fields, model, model_opt = load_test_model(opt)
 
+    # disable any bpe dropout if used
+    for side in 'src', 'tgt':
+        for _, field in fields[side].fields:
+            if type(field) == onmt.inputters.text_dataset.BPEField:
+                field.dropout = 0.0
+
     scorer = onmt.translate.GNMTGlobalScorer.from_opt(opt)
 
     translator = Translator.from_opt(

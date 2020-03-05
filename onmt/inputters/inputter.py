@@ -13,7 +13,7 @@ from torchtext.data import Field, RawField, LabelField
 from torchtext.vocab import Vocab
 from torchtext.data.utils import RandomShuffler
 
-from onmt.inputters.text_dataset import text_fields, TextMultiField
+from onmt.inputters.text_dataset import text_fields, TextMultiField, BPEField
 from onmt.inputters.image_dataset import image_fields
 from onmt.inputters.audio_dataset import audio_fields
 from onmt.inputters.vec_dataset import vec_fields
@@ -108,7 +108,9 @@ def get_fields(
     dynamic_dict=False,
     with_align=False,
     src_truncate=None,
-    tgt_truncate=None
+    tgt_truncate=None,
+    bpe_codes=None,
+    bpe_dropout=0.0,
 ):
     """
     Args:
@@ -130,6 +132,9 @@ def get_fields(
             ``src_data_type``'s data reader - see there for more details).
         tgt_truncate: Cut off tgt sequences beyond this (passed to
             :class:`TextDataReader` - see there for more details).
+        bpe_codes: Path to file containing learned BPE codes.
+        bpe_dropout: Proportion of BPE codes to drop when applying. Default
+            0.0 = no dropout.
 
     Returns:
         A dict mapping names to fields. These names need to match
@@ -152,13 +157,18 @@ def get_fields(
                         "pad": pad, "bos": None, "eos": None,
                         "truncate": src_truncate,
                         "base_name": "src"}
+    if src_data_type == "text":
+        src_field_kwargs["bpe_codes"] = bpe_codes
+        src_field_kwargs["bpe_dropout"] = bpe_dropout
     fields["src"] = fields_getters[src_data_type](**src_field_kwargs)
 
     tgt_field_kwargs = {"n_feats": n_tgt_feats,
                         "include_lengths": False,
                         "pad": pad, "bos": bos, "eos": eos,
                         "truncate": tgt_truncate,
-                        "base_name": "tgt"}
+                        "base_name": "tgt",
+                        "bpe_codes": bpe_codes,
+                        "bpe_dropout": bpe_dropout}
     fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
 
     indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
@@ -822,6 +832,13 @@ def build_dataset_iter(corpus_type, fields, opt, is_train=True, multi=False):
     to iterate over. We implement simple ordered iterator strategy here,
     but more sophisticated strategy like curriculum learning is ok too.
     """
+    if corpus_type == "valid":
+        # disable bpe dropout on validation if used (same as e.g. lstm dropout)
+        for side in 'src', 'tgt':
+            for _, field in fields[side].fields:
+                if type(field) == BPEField:
+                    field.dropout = 0.0
+
     dataset_glob = opt.data + '.' + corpus_type + '.[0-9]*.pt'
     dataset_paths = list(sorted(
         glob.glob(dataset_glob)))

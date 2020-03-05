@@ -3,7 +3,8 @@ from functools import partial
 
 import six
 import torch
-from torchtext.data import Field, RawField
+from torchtext.data import Field, RawField, Pipeline
+from subword_nmt.apply_bpe import BPE
 
 from onmt.inputters.datareader_base import DataReaderBase
 
@@ -151,6 +152,21 @@ class TextMultiField(RawField):
         return self.fields[item]
 
 
+class BPEField(Field):
+    def __init__(self, bpe_codes, bpe_dropout, **kwargs):
+        super(BPEField, self).__init__(**kwargs)
+        with open(bpe_codes) as bpe_f:
+            self.bpe = BPE(bpe_f)
+        self.dropout = bpe_dropout
+        self.tokenize = self.apply_bpe
+
+    # need to subclass this thing so that scope of methods and arguments
+    # works out for multiprocessing pickling: can't use lambdas to pass
+    # bpe and dropout params, so pass through class attributes instead
+    def apply_bpe(self, x):
+        return self.bpe.process_line(x, dropout=self.dropout).split(' ')
+
+
 def text_fields(**kwargs):
     """Create text fields.
 
@@ -162,6 +178,9 @@ def text_fields(**kwargs):
         bos (str or NoneType, optional): Defaults to ``"<s>"``.
         eos (str or NoneType, optional): Defaults to ``"</s>"``.
         truncate (bool or NoneType, optional): Defaults to ``None``.
+        bpe_codes (str or NoneType, optional): File path to learned BPE codes.
+        bpe_dropout (float, optional): Proportion of BPE codes to drop when
+            applying to each example.
 
     Returns:
         TextMultiField
@@ -174,6 +193,8 @@ def text_fields(**kwargs):
     bos = kwargs.get("bos", "<s>")
     eos = kwargs.get("eos", "</s>")
     truncate = kwargs.get("truncate", None)
+    bpe_codes = kwargs.get("bpe_codes", None)
+    bpe_dropout = kwargs.get("bpe_dropout", 0.0)
     fields_ = []
     feat_delim = u"￨" if n_feats > 0 else None
     for i in range(n_feats + 1):
@@ -184,10 +205,18 @@ def text_fields(**kwargs):
             truncate=truncate,
             feat_delim=feat_delim)
         use_len = i == 0 and include_lengths
-        feat = Field(
-            init_token=bos, eos_token=eos,
-            pad_token=pad, tokenize=tokenize,
-            include_lengths=use_len)
+        if bpe_codes is not None:
+            feat = BPEField(
+                bpe_codes=bpe_codes,
+                bpe_dropout=bpe_dropout,
+                init_token=bos, eos_token=eos,
+                pad_token=pad, tokenize=tokenize,
+                include_lengths=use_len)
+        else:
+            feat = Field(
+                init_token=bos, eos_token=eos,
+                pad_token=pad, tokenize=tokenize,
+                include_lengths=use_len)
         fields_.append((name, feat))
     assert fields_[0][0] == base_name  # sanity check
     field = TextMultiField(fields_[0][0], fields_[0][1], fields_[1:])

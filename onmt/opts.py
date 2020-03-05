@@ -327,11 +327,20 @@ def preprocess_opts(parser):
               help="Window type for spectrogram generation.")
 
     # Option most relevant to image input
+    group = parser.add_argument_group('Images')
     group.add('--image_channel_size', '-image_channel_size',
               type=int, default=3,
               choices=[3, 1],
               help="Using grayscale image can training "
                    "model faster and smaller")
+
+    # Options for BPE encoding using subword_nmt
+    group = parser.add_argument_group('Text BPE')
+    group.add('--bpe_codes', '-bpe_codes', type=str, default=None,
+              help="Path to file containing learned BPE codes from subword_nmt")
+    group.add('--bpe_dropout', '-bpe_dropout', type=float, default=0.0,
+              help="Amount of dropout to apply to BPE encoding. Default "
+              "0.0 = no dropout, use for inference.")
 
 
 def train_opts(parser):
