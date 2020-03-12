@@ -325,6 +325,8 @@ def preprocess_opts(parser):
               help="Window stride for spectrogram in seconds.")
     group.add('--window', '-window', default='hamming',
               help="Window type for spectrogram generation.")
+    group.add('--n_mels', '-n_mels', type=int, default=40,
+              help="Number of mel filters to apply to spectrogram features.")
 
     # Option most relevant to image input
     group.add('--image_channel_size', '-image_channel_size',
@@ -573,6 +575,8 @@ def train_opts(parser):
               help="Sample rate.")
     group.add('--window_size', '-window_size', type=float, default=.02,
               help="Window size for spectrogram in seconds.")
+    group.add('--n_mels', '-n_mels', type=int, default=40,
+              help="Number of mel filters to apply to spectrogram features.")
 
     # Option most relevant to image input
     group.add('--image_channel_size', '-image_channel_size',
@@ -736,6 +740,8 @@ def translate_opts(parser):
               help='Window stride for spectrogram in seconds')
     group.add('--window', '-window', default='hamming',
               help='Window type for spectrogram generation')
+    group.add('--n_mels', '-n_mels', type=int, default=40,
+              help="Number of mel filters to apply to spectrogram features.")
 
     # Option most relevant to image input
     group.add('--image_channel_size', '-image_channel_size',
